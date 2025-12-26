@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MyFitness Pro | AI 健身助手 (行動端修復版)</title>
+    <title>MyFitness Pro | AI 健身助手 (安全修復版)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <style>
-        /* Nexus Mobile Optimization: 使用 dvh 確保不會被手機網址列遮擋 */
+        /* Nexus Mobile Optimization */
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f5f5f4; height: 100vh; height: 100dvh; }
         
         .chart-container { position: relative; width: 100%; height: 300px; max-height: 400px; }
@@ -21,7 +21,6 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .nav-item.active { background-color: #ecfccb; color: #3f6212; border-right: 4px solid #65a30d; }
         
-        /* Pulse Animation */
         .pulse-ring {
             display: inline-block; width: 12px; height: 12px; border-radius: 50%;
             background: #ef4444; box-shadow: 0 0 0 #ef4444;
@@ -37,11 +36,8 @@
         .ai-markdown ul { list-style-type: disc; margin-left: 1.5rem; }
         .ai-markdown li { margin-bottom: 0.25rem; }
         
-        /* Modal Animation */
         .modal-enter { opacity: 0; transform: scale(0.95); }
         .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 200ms, transform 200ms; }
-
-        /* Nexus Fix: 強制 iOS 識別點擊區域 */
         .cursor-pointer { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
@@ -83,7 +79,7 @@
         
         <div class="p-4 border-t border-stone-200 bg-stone-50 space-y-2 mb-safe">
             <button onclick="app.toggleModal('apiKeyModal')" class="w-full text-xs text-stone-600 hover:text-emerald-600 flex items-center justify-center py-3 bg-white border border-stone-200 rounded hover:bg-emerald-50 transition font-bold shadow-sm">
-                <i class="fa-solid fa-key mr-2"></i> 查看 API Key
+                <i class="fa-solid fa-key mr-2"></i> 設定 API Key
             </button>
             <button onclick="app.resetAllData()" class="w-full text-xs text-stone-400 hover:text-red-500 flex items-center justify-center py-2">
                 <i class="fa-solid fa-trash-can mr-1"></i> 重置所有資料
@@ -98,7 +94,9 @@
             <button onclick="app.toggleSidebar()" class="text-stone-600 p-2"><i class="fa-solid fa-bars text-xl"></i></button>
         </header>
 
-        <div id="content-area" class="flex-1 relative pb-20 md:pb-0"> <section id="view-dashboard" class="p-4 md:p-6 max-w-7xl mx-auto block fade-in">
+        <div id="content-area" class="flex-1 relative pb-20 md:pb-0">
+            
+            <section id="view-dashboard" class="p-4 md:p-6 max-w-7xl mx-auto block fade-in">
                 
                 <div id="api-key-alert" class="hidden mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between shadow-sm">
                     <div class="flex items-center mb-3 sm:mb-0">
@@ -257,9 +255,13 @@
     <div id="apiKeyModal" class="fixed inset-0 bg-stone-900 bg-opacity-70 hidden items-center justify-center z-[9999] backdrop-blur-sm p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md border border-stone-200 transform transition-all scale-100">
             <h3 class="text-xl font-bold mb-2 text-stone-800 flex items-center"><i class="fa-solid fa-key text-emerald-500 mr-2"></i>設定 API Key</h3>
-            <p class="text-sm text-stone-500 mb-4">目前使用內嵌的金鑰。</p>
+            <p class="text-sm text-stone-500 mb-4">請輸入您的 Google Gemini API Key 以啟用功能。</p>
             <div class="mb-4">
-                <input type="password" id="input-api-key" placeholder="保留空白則使用內建 Key..." class="w-full p-4 border-2 border-emerald-100 rounded-xl focus:outline-none focus:border-emerald-500 text-sm bg-emerald-50 text-stone-800">
+                <input type="password" id="input-api-key" placeholder="貼上 AIza 開頭的 Key..." class="w-full p-4 border-2 border-emerald-100 rounded-xl focus:outline-none focus:border-emerald-500 text-sm bg-emerald-50 text-stone-800">
+            </div>
+            <div class="bg-stone-50 p-3 rounded-lg mb-6 text-xs text-stone-500 border border-stone-200">
+                <i class="fa-solid fa-circle-question mr-1"></i> 沒有 Key?
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 underline font-bold hover:text-blue-800">點此取得</a>
             </div>
             <div class="flex justify-end gap-3">
                 <button onclick="app.toggleModal('apiKeyModal')" class="px-5 py-2.5 text-stone-500 hover:bg-stone-100 rounded-lg font-bold touch-manipulation">取消</button>
@@ -294,7 +296,8 @@
     <script>
         const store = {
             data: { height: 175, goal: 70, weights: [], runs: [], workouts: [] },
-            apiKey: 'AIzaSyCuC_KTmlcRSlOHnR4merFRYF9lyeJiWrE', 
+            // Nexus Note: Cleaned Key for Security
+            apiKey: '', 
             load: function() {
                 const s = localStorage.getItem('mfp_v3');
                 const k = localStorage.getItem('mfp_key');
@@ -324,19 +327,12 @@
                 document.querySelectorAll('input[type="date"]').forEach(i => i.value = new Date().toISOString().split('T')[0]);
             },
             
-            // Nexus Fix: New Sidebar Toggle Logic for Mobile
             toggleSidebar: function() {
                 const sb = document.getElementById('sidebar');
                 const overlay = document.getElementById('sidebar-overlay');
                 sb.classList.toggle('-translate-x-full');
-                
-                if (sb.classList.contains('-translate-x-full')) {
-                    // Closed
-                    overlay.classList.add('hidden');
-                } else {
-                    // Open
-                    overlay.classList.remove('hidden');
-                }
+                if (sb.classList.contains('-translate-x-full')) overlay.classList.add('hidden');
+                else overlay.classList.remove('hidden');
             },
 
             checkApiKey: function() {
@@ -368,7 +364,12 @@
 
             // --- AI Call ---
             callGemini: async function(prompt, title) {
-                if(!store.apiKey) { app.toggleModal('apiKeyModal'); return; }
+                // Nexus Logic: Check Key First!
+                if(!store.apiKey) { 
+                    alert("請先設定 API Key 才能使用此功能。");
+                    app.toggleModal('apiKeyModal'); 
+                    return; 
+                }
                 
                 app.toggleModal('aiResultModal'); 
                 const titleEl = document.getElementById('ai-modal-title');
@@ -386,7 +387,9 @@
                         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                     });
                     const data = await res.json();
+                    
                     if(data.error) throw new Error(data.error.message);
+                    if(!data.candidates || !data.candidates[0]) throw new Error("AI 沒有回應，請稍後再試。");
                     
                     const text = data.candidates[0].content.parts[0].text;
                     const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
@@ -394,7 +397,7 @@
                     document.getElementById('ai-modal-content').innerHTML = html;
                     document.getElementById('ai-modal-content').classList.remove('hidden');
                 } catch(e) {
-                    document.getElementById('ai-modal-content').innerHTML = `<span class="text-red-500">錯誤：${e.message}</span>`;
+                    document.getElementById('ai-modal-content').innerHTML = `<span class="text-red-500 font-bold">發生錯誤：</span><br><span class="text-stone-600">${e.message}</span>`;
                     document.getElementById('ai-modal-content').classList.remove('hidden');
                 } finally {
                     document.getElementById('ai-modal-loading').classList.add('hidden');
@@ -408,10 +411,20 @@
             },
             
             generateWorkoutPlan: function() {
+                // Nexus Logic: Check Key FIRST to avoid silent failure
+                if(!store.apiKey) {
+                    app.toggleModal('aiWorkoutModal'); // Close current modal first
+                    setTimeout(() => {
+                        alert("請先設定 API Key");
+                        app.toggleModal('apiKeyModal');
+                    }, 300);
+                    return;
+                }
+
                 this.toggleModal('aiWorkoutModal'); 
                 const t = document.getElementById('ai-w-target').value;
                 const time = document.getElementById('ai-w-time').value;
-                const p = `請設計一份 ${time} 的 ${t} 健身課表，包含動作、組數次數，並用 Markdown 列表格式呈現 (繁體中文)。`;
+                const p = `請設計一份 ${time} 的 ${t} 健身課表，包含具體動作、組數次數，並用 Markdown 列表格式呈現 (繁體中文)，不需要開場白。`;
                 this.callGemini(p, "AI 課表生成");
             },
 
@@ -419,20 +432,7 @@
                 if(!this.currentRun) return alert("請先選擇紀錄");
                 const r = this.currentRun;
                 const p = `分析跑步: ${r.distance}km, ${r.time}, 配速${r.pace}。請評估強度並給予建議 (繁體中文)。`;
-                const box = document.getElementById('ai-run-result');
-                if(box) box.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 分析中...';
-                
-                if(!store.apiKey) { app.toggleModal('apiKeyModal'); return; }
-                
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${store.apiKey}`;
-                
-                fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({contents:[{parts:[{text:p}]}]}) })
-                    .then(r => r.json())
-                    .then(d => {
-                        const t = d.candidates[0].content.parts[0].text;
-                        if(box) box.innerHTML = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-                    })
-                    .catch(e => { if(box) box.innerHTML = "分析失敗"; });
+                this.callGemini(p, "AI 跑步分析");
             },
 
             safeSetText: function(id, text) {
@@ -446,7 +446,6 @@
                 if(target) target.classList.remove('hidden');
                 if(id === 'running') setTimeout(() => Plotly.Plots.resize('runMap'), 100);
                 
-                // Nexus Fix: Auto-close sidebar on mobile when nav item clicked
                 if (window.innerWidth < 768) {
                     const sb = document.getElementById('sidebar');
                     if (!sb.classList.contains('-translate-x-full')) {
@@ -553,7 +552,6 @@
                 if(!l) return;
                 l.innerHTML='';
                 (store.data.runs || []).forEach(r => {
-                    // Nexus Fix: added cursor-pointer explicitly
                     l.innerHTML += `<div onclick="app.loadRun(${r.id})" class="p-4 border-b hover:bg-stone-50 cursor-pointer flex justify-between group touch-manipulation">
                         <div><div class="font-bold text-sm">${r.title}</div><div class="text-xs text-stone-400">${r.date}</div></div>
                         <div class="flex items-center gap-2 text-xs"><span class="text-stone-500">${r.distance}km</span>
