@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyFitness Pro | AI 健身助手 (已植入 Key 版)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f5f5f4; }
+        .chart-container { position: relative; width: 100%; height: 300px; max-height: 400px; }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .nav-item.active { background-color: #ecfccb; color: #3f6212; border-right: 4px solid #65a30d; }
+        
+        .pulse-ring {
+            display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+            background: #ef4444; box-shadow: 0 0 0 #ef4444;
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .ai-markdown strong { color: #4f46e5; font-weight: 700; }
+        .ai-markdown ul { list-style-type: disc; margin-left: 1.5rem; }
+        .ai-markdown li { margin-bottom: 0.25rem; }
+        
+        /* Modal Animation */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 200ms, transform 200ms; }
+    </style>
+</head>
+<body class="text-stone-800 h-screen overflow-hidden flex flex-col md:flex-row">
+
+    <nav id="sidebar" class="bg-white w-full md:w-64 flex-shrink-0 flex flex-col h-full border-r border-stone-200 z-30 transform -translate-x-full md:translate-x-0 transition-transform duration-300 absolute md:relative shadow-lg md:shadow-none">
+        <div class="p-6 hidden md:block border-b border-stone-100">
+            <h1 class="text-2xl font-bold text-emerald-700 tracking-tight flex items-center">
+                <i class="fa-solid fa-person-running mr-2"></i>MyFitness Pro
+            </h1>
+            <div class="mt-4 flex items-center space-x-3 bg-stone-50 p-2 rounded-lg">
+                <div class="w-8 h-8 rounded-full bg-stone-800 text-white flex items-center justify-center font-bold text-xs">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-bold text-stone-800">我的專屬空間</p>
+                    <p class="text-[10px] text-stone-500 font-bold uppercase flex items-center" id="sidebar-status">
+                        <span class="w-2 h-2 rounded-full bg-stone-400 mr-1"></span> AI 未啟用
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto py-2">
+            <ul class="space-y-1">
+                <li><a href="#" onclick="app.navigate('dashboard')" class="nav-item active flex items-center px-6 py-3 text-stone-600 hover:bg-stone-50 transition"><i class="fa-solid fa-chart-line w-6"></i><span class="font-medium">總覽儀表板</span></a></li>
+                <li><a href="#" onclick="app.navigate('body')" class="nav-item flex items-center px-6 py-3 text-stone-600 hover:bg-stone-50 transition"><i class="fa-solid fa-weight-scale w-6"></i><span class="font-medium">身體數值管理</span></a></li>
+                <li><a href="#" onclick="app.navigate('running')" class="nav-item flex items-center px-6 py-3 text-stone-600 hover:bg-stone-50 transition"><i class="fa-solid fa-map-location-dot w-6"></i><span class="font-medium">跑步與 GPS</span></a></li>
+                <li><a href="#" onclick="app.navigate('workout')" class="nav-item flex items-center px-6 py-3 text-stone-600 hover:bg-stone-50 transition"><i class="fa-solid fa-dumbbell w-6"></i><span class="font-medium">健身紀錄</span></a></li>
+            </ul>
+        </div>
+        
+        <div class="p-4 border-t border-stone-200 bg-stone-50 space-y-2">
+            <button onclick="app.toggleModal('apiKeyModal')" class="w-full text-xs text-stone-600 hover:text-emerald-600 flex items-center justify-center py-2 bg-white border border-stone-200 rounded hover:bg-emerald-50 transition font-bold shadow-sm">
+                <i class="fa-solid fa-key mr-2"></i> 查看 API Key
+            </button>
+            <button onclick="app.resetAllData()" class="w-full text-xs text-stone-400 hover:text-red-500 flex items-center justify-center py-1">
+                <i class="fa-solid fa-trash-can mr-1"></i> 重置所有資料
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-1 overflow-y-auto bg-stone-50 relative w-full flex flex-col">
+        
+        <header class="md:hidden bg-white p-4 flex justify-between items-center shadow-sm z-20 flex-shrink-0">
+            <div class="font-bold text-lg text-emerald-700">MyFitness Pro</div>
+            <button onclick="document.getElementById('sidebar').classList.toggle('-translate-x-full')" class="text-stone-600"><i class="fa-solid fa-bars text-xl"></i></button>
+        </header>
+
+        <div id="content-area" class="flex-1 relative">
+            
+            <section id="view-dashboard" class="p-6 max-w-7xl mx-auto block fade-in">
+                
+                <div id="api-key-alert" class="hidden mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between shadow-sm">
+                    <div class="flex items-center mb-3 sm:mb-0">
+                        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-500 mr-4 flex-shrink-0">
+                            <i class="fa-solid fa-robot text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-red-700">AI 功能尚未啟用</h3>
+                            <p class="text-xs text-red-600">請輸入您的 Google Gemini API Key 以解鎖智能教練、營養建議與路徑分析。</p>
+                        </div>
+                    </div>
+                    <button onclick="app.toggleModal('apiKeyModal')" class="w-full sm:w-auto px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-700 shadow-sm transition">
+                        立即設定 <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-stone-800">總覽儀表板</h2>
+                    <p class="text-stone-500 mt-2">追蹤您的進度，保持最佳狀態。</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100">
+                        <p class="text-sm text-stone-500">目前體重</p>
+                        <h3 class="text-3xl font-bold text-stone-800 mt-1"><span id="dash-weight">--</span> <span class="text-sm font-normal text-stone-400">kg</span></h3>
+                        <p class="text-xs text-stone-400 mt-2">目標: <span id="dash-goal">--</span> kg</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100">
+                        <p class="text-sm text-stone-500">BMI 指數</p>
+                        <h3 class="text-3xl font-bold text-stone-800 mt-1" id="dash-bmi">--</h3>
+                        <p class="text-xs text-stone-400 mt-2" id="dash-bmi-eval">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100">
+                        <p class="text-sm text-stone-500">總跑量</p>
+                        <h3 class="text-3xl font-bold text-stone-800 mt-1"><span id="dash-dist">0</span> <span class="text-sm font-normal text-stone-400">km</span></h3>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100">
+                        <p class="text-sm text-stone-500">健身次數</p>
+                        <h3 class="text-3xl font-bold text-stone-800 mt-1" id="dash-gym-count">0</h3>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100 lg:col-span-2">
+                        <h3 class="font-bold text-stone-800 mb-4">體重變化</h3>
+                        <div class="chart-container"><canvas id="mainChart"></canvas></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100">
+                        <h3 class="font-bold text-stone-800 mb-4">運動比例</h3>
+                        <div class="chart-container"><canvas id="pieChart"></canvas></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-running" class="p-6 max-w-7xl mx-auto hidden fade-in">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <h2 class="text-2xl font-bold text-stone-800">跑步紀錄</h2>
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <button onclick="tracker.toggleTracking()" id="btn-tracking" class="flex-1 md:flex-none justify-center px-6 py-3 bg-stone-900 text-white rounded-full shadow-lg hover:bg-stone-800 transition flex items-center space-x-2">
+                            <i class="fa-solid fa-play"></i><span>開始 GPS 紀錄</span>
+                        </button>
+                        <button onclick="app.toggleModal('manualRunModal')" class="flex-1 md:flex-none justify-center px-4 py-3 bg-white text-emerald-600 border border-emerald-200 rounded-full shadow-sm hover:bg-emerald-50 transition font-bold">
+                            <i class="fa-solid fa-pen"></i> 手動
+                        </button>
+                    </div>
+                </div>
+
+                <div id="live-tracking-panel" class="hidden bg-emerald-900 text-white p-6 rounded-xl shadow-xl mb-6 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-20"><i class="fa-solid fa-location-arrow text-9xl"></i></div>
+                    <div class="relative z-10 flex flex-col md:flex-row justify-between items-center">
+                        <div class="flex items-center space-x-2 mb-4 md:mb-0">
+                            <span class="pulse-ring"></span>
+                            <span class="font-bold tracking-widest text-emerald-300 text-sm uppercase">GPS 紀錄中...</span>
+                        </div>
+                        <div class="text-4xl font-mono font-bold" id="live-timer">00:00</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-stone-100 flex flex-col h-[600px]">
+                        <div class="p-4 border-b border-stone-200 bg-stone-50 font-bold text-stone-700">紀錄列表</div>
+                        <div class="flex-1 overflow-y-auto p-2 space-y-2" id="run-list"></div>
+                    </div>
+
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100 border-l-4 border-l-indigo-500">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="font-bold text-stone-800 flex items-center"><i class="fa-solid fa-robot text-indigo-500 mr-2"></i>AI 跑步教練</h3>
+                                    <p class="text-xs text-stone-400 mt-1">分析配速、地形與表現</p>
+                                </div>
+                                <button onclick="app.analyzeRun()" class="text-xs bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg font-bold border border-indigo-100 hover:bg-indigo-100">
+                                    <i class="fa-solid fa-bolt mr-1"></i> 分析
+                                </button>
+                            </div>
+                            <div id="ai-run-result" class="text-sm text-stone-600 bg-stone-50 p-4 rounded-lg min-h-[60px] ai-markdown">請選擇紀錄並點擊分析按鈕。</div>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-stone-100">
+                            <div id="runMap" class="w-full h-[350px] bg-stone-50 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-workout" class="p-6 max-w-7xl mx-auto hidden fade-in">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <h2 class="text-2xl font-bold text-stone-800">健身紀錄</h2>
+                    <div class="flex gap-2">
+                        <button onclick="app.toggleModal('aiWorkoutModal')" class="px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-100 transition font-bold flex items-center">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-2"></i>AI 課表
+                        </button>
+                        <button onclick="app.toggleModal('workoutModal')" class="px-4 py-2 bg-purple-600 text-white rounded-lg shadow hover:bg-purple-700 transition">
+                            <i class="fa-solid fa-plus mr-1"></i>新增
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100 min-h-[400px]">
+                    <div id="workout-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                </div>
+            </section>
+            
+            <section id="view-body" class="p-6 max-w-7xl mx-auto hidden fade-in">
+                <h2 class="text-2xl font-bold text-stone-800 mb-6">身體數值</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100 h-fit">
+                        <h3 class="font-bold text-lg mb-4 text-stone-800 border-b pb-2">基本資料</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-stone-600 mb-1">身高 (cm)</label>
+                                <input type="number" id="input-height" class="w-full p-2 border border-stone-300 rounded bg-stone-50" onchange="app.saveProfile()">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-stone-600 mb-1">目標體重 (kg)</label>
+                                <input type="number" id="input-goal" class="w-full p-2 border border-stone-300 rounded bg-stone-50" onchange="app.saveProfile()">
+                            </div>
+                            <button onclick="app.generateDietPlan()" class="w-full mt-4 py-3 bg-gradient-to-r from-teal-500 to-emerald-600 text-white rounded-lg shadow-md hover:from-teal-600 hover:to-emerald-700 transition font-bold">
+                                <i class="fa-solid fa-user-doctor mr-2"></i> AI 營養建議
+                            </button>
+                        </div>
+                    </div>
+                    <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-stone-100 flex flex-col">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2">
+                            <h3 class="font-bold text-lg text-stone-800">體重紀錄</h3>
+                            <button onclick="app.toggleModal('weightModal')" class="text-sm bg-stone-800 text-white px-3 py-1.5 rounded hover:bg-stone-700 font-bold">
+                                <i class="fa-solid fa-plus mr-1"></i>新增
+                            </button>
+                        </div>
+                        <div id="weight-list" class="flex-1 overflow-y-auto max-h-[500px] divide-y divide-stone-100"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <div id="apiKeyModal" class="fixed inset-0 bg-stone-900 bg-opacity-70 hidden items-center justify-center z-[9999] backdrop-blur-sm">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md m-4 border border-stone-200 transform transition-all scale-100">
+            <h3 class="text-xl font-bold mb-2 text-stone-800 flex items-center"><i class="fa-solid fa-key text-emerald-500 mr-2"></i>設定 API Key</h3>
+            <p class="text-sm text-stone-500 mb-4">目前使用內嵌的金鑰。若需更換，請下方輸入。</p>
+            
+            <div class="mb-4">
+                <input type="password" id="input-api-key" placeholder="保留空白則使用內建 Key..." class="w-full p-4 border-2 border-emerald-100 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 font-mono text-sm bg-emerald-50 text-stone-800 transition">
+            </div>
+            
+            <div class="bg-stone-50 p-3 rounded-lg mb-6 text-xs text-stone-500 border border-stone-200">
+                <i class="fa-solid fa-circle-question mr-1"></i> 不知道輸入什麼？
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 underline font-bold hover:text-blue-800">點此複製您的 Key</a>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button onclick="app.toggleModal('apiKeyModal')" class="px-5 py-2.5 text-stone-500 hover:bg-stone-100 rounded-lg font-bold">取消</button>
+                <button onclick="app.saveApiKey()" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-lg font-bold">確認儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="aiResultModal" class="fixed inset-0 bg-stone-900 bg-opacity-50 hidden items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg m-4 max-h-[80vh] overflow-y-auto flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-stone-800 flex items-center" id="ai-modal-title"><i class="fa-solid fa-robot mr-2 text-indigo-500"></i>AI 分析結果</h3>
+                <button onclick="app.toggleModal('aiResultModal')" class="text-stone-400 hover:text-stone-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="ai-modal-loading" class="py-12 text-center text-indigo-500">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl"></i>
+                <p class="mt-4 font-bold">AI 正在思考中...</p>
+            </div>
+            <div id="ai-modal-content" class="hidden text-sm leading-relaxed ai-markdown space-y-2 bg-stone-50 p-4 rounded-lg border border-stone-100"></div>
+            <button onclick="app.toggleModal('aiResultModal')" class="mt-4 w-full py-2 bg-stone-200 text-stone-600 rounded-lg hover:bg-stone-300 font-bold">關閉</button>
+        </div>
+    </div>
+
+    <div id="weightModal" class="fixed inset-0 bg-stone-900 bg-opacity-50 hidden items-center justify-center z-50"><div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm m-4"><h3 class="text-lg font-bold mb-4">新增體重</h3><input type="date" id="m-weight-date" class="w-full mb-3 p-2 border rounded"><input type="number" id="m-weight-val" placeholder="kg" class="w-full mb-6 p-2 border rounded"><div class="flex justify-end gap-2"><button onclick="app.toggleModal('weightModal')" class="px-4 py-2 text-stone-500">取消</button><button onclick="app.addWeight()" class="px-4 py-2 bg-emerald-600 text-white rounded">儲存</button></div></div></div>
+    
+    <div id="manualRunModal" class="fixed inset-0 bg-stone-900 bg-opacity-50 hidden items-center justify-center z-50"><div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm m-4"><h3 class="text-lg font-bold mb-4">手動跑步</h3><input type="date" id="m-run-date" class="w-full mb-3 p-2 border rounded"><input type="text" id="m-run-title" placeholder="標題" class="w-full mb-3 p-2 border rounded"><div class="flex gap-2 mb-3"><input type="number" id="m-run-dist" placeholder="km" class="w-1/2 p-2 border rounded"><input type="text" id="m-run-time" placeholder="00:30:00" class="w-1/2 p-2 border rounded"></div><div class="flex justify-end gap-2"><button onclick="app.toggleModal('manualRunModal')" class="px-4 py-2 text-stone-500">取消</button><button onclick="app.addRunManual()" class="px-4 py-2 bg-stone-800 text-white rounded">儲存</button></div></div></div>
+
+    <div id="workoutModal" class="fixed inset-0 bg-stone-900 bg-opacity-50 hidden items-center justify-center z-50"><div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm m-4"><h3 class="text-lg font-bold mb-4">新增健身</h3><input type="date" id="m-work-date" class="w-full mb-3 p-2 border rounded"><select id="m-work-type" class="w-full mb-3 p-2 border rounded"><option>胸肌</option><option>背部</option><option>腿部</option><option>肩膀</option><option>手臂</option><option>核心</option><option>有氧</option></select><input type="number" id="m-work-duration" placeholder="分鐘" class="w-full mb-6 p-2 border rounded"><div class="flex justify-end gap-2"><button onclick="app.toggleModal('workoutModal')" class="px-4 py-2 text-stone-500">取消</button><button onclick="app.addWorkout()" class="px-4 py-2 bg-purple-600 text-white rounded">儲存</button></div></div></div>
+
+    <div id="aiWorkoutModal" class="fixed inset-0 bg-stone-900 bg-opacity-50 hidden items-center justify-center z-50"><div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm m-4"><h3 class="text-lg font-bold mb-4">AI 課表生成</h3><select id="ai-w-target" class="w-full mb-3 p-2 border rounded"><option>全身</option><option>胸/背</option><option>腿/臀</option></select><select id="ai-w-time" class="w-full mb-6 p-2 border rounded"><option>30分</option><option>45分</option><option>60分</option></select><button onclick="app.generateWorkoutPlan()" class="w-full py-2 bg-indigo-600 text-white rounded font-bold">生成</button><button onclick="app.toggleModal('aiWorkoutModal')" class="w-full mt-2 py-2 text-stone-400 text-sm">取消</button></div></div>
+
+    <script>
+        const store = {
+            data: { height: 175, goal: 70, weights: [], runs: [], workouts: [] },
+            // Nexus Security Note: For local testing only. Do not publish code with hardcoded keys.
+            apiKey: 'AIzaSyCuC_KTmlcRSlOHnR4merFRYF9lyeJiWrE', 
+            load: function() {
+                const s = localStorage.getItem('mfp_v3');
+                const k = localStorage.getItem('mfp_key');
+                if(s) {
+                    this.data = JSON.parse(s);
+                    if(!this.data.weights) this.data.weights = [];
+                    if(!this.data.runs) this.data.runs = [];
+                    if(!this.data.workouts) this.data.workouts = [];
+                } else { 
+                    this.data.weights=[{date:new Date().toISOString().split('T')[0],val:70}]; 
+                    this.save(); 
+                }
+                // Only override the hardcoded key if the user has manually saved a new one in the UI
+                if(k) this.apiKey = k;
+            },
+            save: function() { localStorage.setItem('mfp_v3', JSON.stringify(this.data)); },
+            saveKey: function(k) { this.apiKey = k; localStorage.setItem('mfp_key', k); },
+            reset: function() { localStorage.removeItem('mfp_v3'); localStorage.removeItem('mfp_key'); location.reload(); }
+        };
+
+        const app = {
+            charts: {},
+            currentRun: null,
+            init: function() {
+                store.load();
+                this.checkApiKey();
+                // Safety: wait for DOM slightly if needed, but DOMContentLoaded is usually enough.
+                this.renderAll();
+                document.querySelectorAll('input[type="date"]').forEach(i => i.value = new Date().toISOString().split('T')[0]);
+            },
+
+            checkApiKey: function() {
+                const alertBox = document.getElementById('api-key-alert');
+                const status = document.getElementById('sidebar-status');
+                const input = document.getElementById('input-api-key');
+                
+                // If apiKey exists (which it does now, hardcoded), show ready state
+                if(!store.apiKey) {
+                    if(alertBox) alertBox.classList.remove('hidden');
+                    if(status) status.innerHTML = '<span class="w-2 h-2 rounded-full bg-stone-400 mr-1"></span> AI 未啟用';
+                } else {
+                    if(alertBox) alertBox.classList.add('hidden');
+                    if(status) status.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 mr-1"></span> AI 已就緒';
+                    if(input) input.value = store.apiKey; // Show key in input for verification
+                }
+            },
+
+            saveApiKey: function() {
+                const k = document.getElementById('input-api-key').value.trim();
+                if(k && !k.startsWith('AIza')) {
+                    alert("Key 格式似乎不正確，通常以 AIza 開頭。");
+                    return;
+                }
+                // Allow clearing the key to revert to hardcoded or empty
+                store.saveKey(k);
+                this.toggleModal('apiKeyModal');
+                this.checkApiKey();
+                alert("設定成功！");
+            },
+
+            // --- AI Call (Nexus: Using gemini-1.5-flash) ---
+            callGemini: async function(prompt, title) {
+                if(!store.apiKey) { app.toggleModal('apiKeyModal'); return; }
+                
+                app.toggleModal('aiResultModal'); // Open Generic Modal
+                const titleEl = document.getElementById('ai-modal-title');
+                if(titleEl) titleEl.innerText = title;
+                
+                document.getElementById('ai-modal-content').classList.add('hidden');
+                document.getElementById('ai-modal-loading').classList.remove('hidden');
+
+                // Nexus: 使用穩定的 flash 模型
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${store.apiKey}`;
+                
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                    });
+                    const data = await res.json();
+                    if(data.error) throw new Error(data.error.message);
+                    
+                    const text = data.candidates[0].content.parts[0].text;
+                    const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+                    
+                    document.getElementById('ai-modal-content').innerHTML = html;
+                    document.getElementById('ai-modal-content').classList.remove('hidden');
+                } catch(e) {
+                    document.getElementById('ai-modal-content').innerHTML = `<span class="text-red-500">錯誤：${e.message}</span>`;
+                    document.getElementById('ai-modal-content').classList.remove('hidden');
+                } finally {
+                    document.getElementById('ai-modal-loading').classList.add('hidden');
+                }
+            },
+
+            // --- Features ---
+            generateDietPlan: function() {
+                const p = `我是身高${store.data.height}cm, 體重${store.data.weights.length ? store.data.weights.slice(-1)[0].val : '未知'}kg的健身者。請提供TDEE估算、營養建議與三餐範例 (繁體中文)。`;
+                this.callGemini(p, "AI 營養建議");
+            },
+            
+            generateWorkoutPlan: function() {
+                this.toggleModal('aiWorkoutModal'); // Close input
+                const t = document.getElementById('ai-w-target').value;
+                const time = document.getElementById('ai-w-time').value;
+                const p = `請設計一份 ${time} 的 ${t} 健身課表，包含動作、組數次數，並用 Markdown 列表格式呈現 (繁體中文)。`;
+                this.callGemini(p, "AI 課表生成");
+            },
+
+            analyzeRun: function() {
+                if(!this.currentRun) return alert("請先選擇紀錄");
+                const r = this.currentRun;
+                const p = `分析跑步: ${r.distance}km, ${r.time}, 配速${r.pace}。請評估強度並給予建議 (繁體中文)。`;
+                const box = document.getElementById('ai-run-result');
+                if(box) box.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 分析中...';
+                
+                if(!store.apiKey) { app.toggleModal('apiKeyModal'); return; }
+                
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${store.apiKey}`;
+                
+                fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({contents:[{parts:[{text:p}]}]}) })
+                    .then(r => r.json())
+                    .then(d => {
+                        const t = d.candidates[0].content.parts[0].text;
+                        if(box) box.innerHTML = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+                    })
+                    .catch(e => { if(box) box.innerHTML = "分析失敗"; });
+            },
+
+            // --- SAFE UPDATE HELPERS ---
+            safeSetText: function(id, text) {
+                const el = document.getElementById(id);
+                if(el) el.innerText = text;
+            },
+
+            navigate: function(id) {
+                document.querySelectorAll('section').forEach(e => e.classList.add('hidden'));
+                const target = document.getElementById('view-'+id);
+                if(target) target.classList.remove('hidden');
+                if(id === 'running') setTimeout(() => Plotly.Plots.resize('runMap'), 100);
+            },
+            toggleModal: function(id) {
+                const el = document.getElementById(id);
+                if(el) {
+                    el.classList.toggle('hidden');
+                    el.classList.toggle('flex');
+                }
+            },
+            resetAllData: function() { store.reset(); },
+            saveProfile: function() { 
+                const hEl = document.getElementById('input-height');
+                const gEl = document.getElementById('input-goal');
+                if(hEl) store.data.height = hEl.value; 
+                if(gEl) store.data.goal = gEl.value; 
+                store.save(); 
+                this.updateDash(); 
+            },
+            addWeight: function() { 
+                store.data.weights.push({
+                    date: document.getElementById('m-weight-date').value, 
+                    val: document.getElementById('m-weight-val').value
+                }); 
+                store.save(); 
+                this.toggleModal('weightModal'); 
+                this.renderAll(); 
+            },
+            addWorkout: function() { 
+                store.data.workouts.unshift({
+                    date: document.getElementById('m-work-date').value, 
+                    type: document.getElementById('m-work-type').value, 
+                    duration: document.getElementById('m-work-duration').value
+                }); 
+                store.save(); 
+                this.toggleModal('workoutModal'); 
+                this.renderAll(); 
+            },
+            addRunManual: function() { 
+                const r = {
+                    id: Date.now(), 
+                    date: document.getElementById('m-run-date').value, 
+                    title: document.getElementById('m-run-title').value, 
+                    distance: document.getElementById('m-run-dist').value, 
+                    time: document.getElementById('m-run-time').value, 
+                    pace: '--', 
+                    route: {x:[],y:[]}
+                };
+                store.data.runs.unshift(r); 
+                store.save(); 
+                this.toggleModal('manualRunModal'); 
+                this.renderAll();
+            },
+            deleteRun: function(id, e) { e.stopPropagation(); store.data.runs = store.data.runs.filter(r=>r.id!==id); store.save(); this.renderAll(); },
+            
+            renderAll: function() {
+                this.updateDash();
+                this.renderRuns();
+                this.renderWorkouts();
+                this.renderWeights();
+                const hEl = document.getElementById('input-height');
+                const gEl = document.getElementById('input-goal');
+                if(hEl) hEl.value = store.data.height;
+                if(gEl) gEl.value = store.data.goal;
+            },
+            updateDash: function() {
+                const d = store.data;
+                const w = d.weights.length ? d.weights[d.weights.length-1].val : 0;
+                
+                this.safeSetText('dash-weight', w);
+                this.safeSetText('dash-goal', d.goal);
+                
+                if(w && d.height) {
+                    const h = d.height / 100;
+                    const bmi = (w / (h*h)).toFixed(1);
+                    this.safeSetText('dash-bmi', bmi);
+                    
+                    // BMI Eval Logic
+                    let evalText = "適中";
+                    let colorClass = "text-emerald-600";
+                    if(bmi < 18.5) { evalText = "過輕"; colorClass = "text-orange-500"; }
+                    else if(bmi >= 24) { evalText = "過重"; colorClass = "text-orange-500"; }
+                    
+                    this.safeSetText('dash-bmi-eval', evalText);
+                    const evalEl = document.getElementById('dash-bmi-eval');
+                    if(evalEl) evalEl.className = "text-xs mt-2 font-bold " + colorClass;
+                } else {
+                    this.safeSetText('dash-bmi', '--');
+                    this.safeSetText('dash-bmi-eval', '--');
+                }
+
+                // Safe reduce for runs
+                const totalDist = (d.runs || []).reduce((a,c)=>a+parseFloat(c.distance||0),0).toFixed(1);
+                this.safeSetText('dash-dist', totalDist);
+                this.safeSetText('dash-gym-count', (d.workouts || []).length);
+                
+                this.renderChart();
+            },
+            renderRuns: function() {
+                const l = document.getElementById('run-list'); 
+                if(!l) return;
+                l.innerHTML='';
+                (store.data.runs || []).forEach(r => {
+                    l.innerHTML += `<div onclick="app.loadRun(${r.id})" class="p-3 border-b hover:bg-stone-50 cursor-pointer flex justify-between group">
+                        <div><div class="font-bold text-sm">${r.title}</div><div class="text-xs text-stone-400">${r.date}</div></div>
+                        <div class="flex items-center gap-2 text-xs"><span class="text-stone-500">${r.distance}km</span>
+                        <button onclick="app.deleteRun(${r.id}, event)" class="text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><i class="fa-solid fa-trash"></i></button></div>
+                    </div>`;
+                });
+            },
+            loadRun: function(id) {
+                this.currentRun = store.data.runs.find(r=>r.id===id);
+                const resBox = document.getElementById('ai-run-result');
+                if(resBox) resBox.innerHTML = `已選擇：${this.currentRun.title}。點擊分析按鈕。`;
+                
+                // Simple Map placeholder for manual runs
+                const trace = {x:this.currentRun.route.x, y:this.currentRun.route.y, mode:'lines+markers', type:'scatter', line:{color:'#10b981'}};
+                Plotly.newPlot('runMap', [trace], {margin:{t:0,b:0,l:0,r:0}, xaxis:{visible:false}, yaxis:{visible:false}}, {displayModeBar:false});
+            },
+            renderWorkouts: function() {
+                const l = document.getElementById('workout-list'); 
+                if(!l) return;
+                l.innerHTML='';
+                (store.data.workouts || []).forEach(w => l.innerHTML += `<div class="bg-stone-50 p-4 rounded border-l-4 border-purple-500"><div class="font-bold">${w.type}</div><div class="text-xs text-stone-500">${w.date} - ${w.duration}分</div></div>`);
+            },
+            renderWeights: function() {
+                const l = document.getElementById('weight-list'); 
+                if(!l) return;
+                l.innerHTML='';
+                (store.data.weights || []).slice().reverse().forEach(w => l.innerHTML += `<div class="p-4 border-b flex justify-between"><span>${w.date}</span><span class="font-bold">${w.val} kg</span></div>`);
+            },
+            renderChart: function() {
+                const ctx = document.getElementById('mainChart');
+                if(ctx) {
+                    if(this.charts.main) this.charts.main.destroy();
+                    this.charts.main = new Chart(ctx.getContext('2d'), {type:'line', data:{labels:store.data.weights.map(w=>w.date), datasets:[{label:'體重', data:store.data.weights.map(w=>w.val), borderColor:'#059669', tension:0.3}]}, options:{maintainAspectRatio:false}});
+                }
+                
+                const ctx2 = document.getElementById('pieChart');
+                if(ctx2) {
+                    if(this.charts.pie) this.charts.pie.destroy();
+                    this.charts.pie = new Chart(ctx2.getContext('2d'), {type:'doughnut', data:{labels:['跑','健'], datasets:[{data:[(store.data.runs||[]).length, (store.data.workouts||[]).length], backgroundColor:['#f97316','#8b5cf6']}]}});
+                }
+            }
+        };
+
+        // Tracker (Simplified)
+        const tracker = {
+            id:null, pos:[], start:0,
+            toggleTracking: function() { if(this.id) this.stop(); else this.start(); },
+            start: function() { 
+                if(!navigator.geolocation) return alert('No GPS');
+                this.start=Date.now(); this.pos=[]; 
+                const btn = document.getElementById('btn-tracking');
+                if(btn) btn.innerHTML='<i class="fa-solid fa-stop"></i> 停止';
+                const panel = document.getElementById('live-tracking-panel');
+                if(panel) panel.classList.remove('hidden');
+                
+                this.id = setInterval(()=>{
+                    const t=Math.floor((Date.now()-this.start)/1000);
+                    const timerEl = document.getElementById('live-timer');
+                    if(timerEl) timerEl.innerText = `${Math.floor(t/60)}:${(t%60).toString().padStart(2,'0')}`;
+                    navigator.geolocation.getCurrentPosition(p=>{
+                        this.pos.push({lat:p.coords.latitude, lng:p.coords.longitude});
+                    });
+                }, 1000);
+            },
+            stop: function() {
+                clearInterval(this.id); this.id=null;
+                const btn = document.getElementById('btn-tracking');
+                if(btn) btn.innerHTML='開始 GPS';
+                const panel = document.getElementById('live-tracking-panel');
+                if(panel) panel.classList.add('hidden');
+                
+                if(this.pos.length<2) return alert('移動距離過短');
+                const dist = (this.pos.length * 0.005).toFixed(2); // Mock dist logic
+                const timerEl = document.getElementById('live-timer');
+                
+                store.data.runs.unshift({
+                    id:Date.now(), 
+                    date:new Date().toISOString().split('T')[0], 
+                    title:'GPS 跑步', 
+                    distance:dist, 
+                    time: timerEl ? timerEl.innerText : '00:00', 
+                    pace:'--', 
+                    route:{x:this.pos.map(p=>p.lat), y:this.pos.map(p=>p.lng)}
+                });
+                store.save(); 
+                app.renderAll();
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', ()=>app.init());
+    </script>
+</body>
+</html>
